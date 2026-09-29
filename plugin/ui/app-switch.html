@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>App switch settings</title>
+    <script src="sdpi-components.js"></script>
+    <script src="connection.js"></script>
+    <link rel="stylesheet" href="pi.css" />
+  </head>
+  <body>
+    <div id="awtrix-connection"></div>
+
+    <sdpi-item label="On press">
+      <sdpi-select setting="mode" default="next">
+        <option value="next">Show the next app</option>
+        <option value="previous">Show the previous app</option>
+        <option value="app">Switch to an app</option>
+      </sdpi-select>
+    </sdpi-item>
+
+    <sdpi-item label="App">
+      <sdpi-select setting="appName" datasource="getApps" hot-reload placeholder="Select an app" loading="Loading apps…"></sdpi-select>
+    </sdpi-item>
+
+    <p class="hint">
+      The app is only used for "Switch to an app". The list comes from the panel's app loop; the key shows the app currently
+      on the panel.
+    </p>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Brightness dial settings</title>
+    <script src="sdpi-components.js"></script>
+    <script src="connection.js"></script>
+    <link rel="stylesheet" href="pi.css" />
+  </head>
+  <body>
+    <div id="awtrix-connection"></div>
+
+    <sdpi-item label="Step per tick">
+      <sdpi-select setting="step" default="8">
+        <option value="1">1</option>
+        <option value="4">4</option>
+        <option value="8">8</option>
+        <option value="16">16</option>
+      </sdpi-select>
+    </sdpi-item>
+
+    <p class="hint">
+      Turn the dial to set the brightness (0 to 255); turning switches auto brightness off. Push the dial or tap the touch
+      strip to toggle auto brightness. The touch strip shows the current value.
+    </p>
+  </body>
+</html>

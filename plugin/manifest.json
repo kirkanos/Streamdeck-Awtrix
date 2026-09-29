@@ -1,0 +1,130 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.kirkanos.awtrix",
+  "Name": "AWTRIX Remote",
+  "Version": "0.0.0.0",
+  "Author": "Andreas Hacker",
+  "Description": "Control an AWTRIX NG panel and show Claude Code status on the Stream Deck.",
+  "URL": "https://github.com/kirkanos/Streamdeck-Awtrix",
+  "Icon": "images/icon",
+  "Category": "AWTRIX Remote",
+  "CategoryIcon": "images/category",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 3,
+  "Nodejs": {
+    "Version": "24",
+    "Debug": "enabled"
+  },
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "12"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Actions": [
+    {
+      "UUID": "com.kirkanos.awtrix.night-mode",
+      "Name": "Night Mode",
+      "Icon": "images/actions/night-mode",
+      "Tooltip": "Switch the panel off or dim it to a night brightness; press again to restore",
+      "PropertyInspectorPath": "ui/night-mode.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "SupportedInMultiActions": false,
+      "States": [
+        {
+          "Image": "images/key",
+          "TitleAlignment": "top",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.kirkanos.awtrix.brightness",
+      "Name": "Brightness",
+      "Icon": "images/actions/brightness",
+      "Tooltip": "Turn to set the panel brightness, push to toggle auto brightness",
+      "PropertyInspectorPath": "ui/brightness.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "Encoder": {
+        "layout": "layouts/dial.json",
+        "Icon": "images/actions/brightness",
+        "TriggerDescription": {
+          "Rotate": "Brightness",
+          "Push": "Auto brightness on / off",
+          "Touch": "Auto brightness on / off"
+        }
+      },
+      "SupportedInMultiActions": false,
+      "States": [
+        {
+          "Image": "images/key"
+        }
+      ]
+    },
+    {
+      "UUID": "com.kirkanos.awtrix.app-switch",
+      "Name": "App Switch",
+      "Icon": "images/actions/app-switch",
+      "Tooltip": "Show the next or previous app on the panel, or jump to a named app",
+      "PropertyInspectorPath": "ui/app-switch.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "SupportedInMultiActions": false,
+      "States": [
+        {
+          "Image": "images/key",
+          "TitleAlignment": "top",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.kirkanos.awtrix.notify",
+      "Name": "Notify",
+      "Icon": "images/actions/notify",
+      "Tooltip": "Send a notification with text, icon, color and sound to the panel",
+      "PropertyInspectorPath": "ui/notify.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "SupportedInMultiActions": false,
+      "States": [
+        {
+          "Image": "images/key",
+          "TitleAlignment": "top",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.kirkanos.awtrix.claude-status",
+      "Name": "Claude Status",
+      "Icon": "images/actions/claude-status",
+      "Tooltip": "Claude Code status per project: green done, amber needs input; press to focus the terminal",
+      "PropertyInspectorPath": "ui/claude-status.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "SupportedInMultiActions": false,
+      "States": [
+        {
+          "Image": "images/key",
+          "TitleAlignment": "top",
+          "FontSize": 10
+        }
+      ]
+    }
+  ]
+}

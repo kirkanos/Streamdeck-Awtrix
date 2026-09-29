@@ -1,6 +1,6 @@
 # Streamdeck-Awtrix
 
-Stream Deck plugin `com.kirkanos.awtrix`. Status: plan only, no code yet.
+Stream Deck plugin `com.kirkanos.awtrix`. Status: M1 to M3 implemented (see README.md), M4 open.
 
 ## Goal
 
@@ -32,9 +32,9 @@ Control the AWTRIX NG panel from the deck and show the Claude Code status per pr
 
 ## Milestones
 
-- M1: Night mode and Notify keys, stats polling.
-- M2: Brightness dial, App switch.
-- M3: Claude status listener, hook change in awtrix-ng-scripts, focus action.
+- M1: Night mode and Notify keys, stats polling. Done.
+- M2: Brightness dial, App switch. Done.
+- M3: Claude status listener, focus action. Done; the hook change (one `curl` line, see README.md) is still to be made in awtrix-ng-scripts.
 - M4: CI workflows, release `v1.0.0`.
 
 ## Scaffold

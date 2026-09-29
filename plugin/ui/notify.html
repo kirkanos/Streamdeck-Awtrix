@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Notify settings</title>
+    <script src="sdpi-components.js"></script>
+    <script src="connection.js"></script>
+    <link rel="stylesheet" href="pi.css" />
+  </head>
+  <body>
+    <div id="awtrix-connection"></div>
+
+    <sdpi-item label="Text">
+      <sdpi-textfield setting="text" placeholder="Text to scroll on the panel"></sdpi-textfield>
+    </sdpi-item>
+
+    <sdpi-item label="Icon">
+      <sdpi-textfield setting="icon" placeholder="LaMetric icon ID or file name, e.g. 71832"></sdpi-textfield>
+    </sdpi-item>
+
+    <sdpi-item label="Color">
+      <sdpi-color setting="color" default="#FFFFFF"></sdpi-color>
+    </sdpi-item>
+
+    <sdpi-item label="Sound">
+      <sdpi-textfield setting="sound" placeholder="RTTTL, or a melody file name"></sdpi-textfield>
+    </sdpi-item>
+
+    <sdpi-item label="Duration (s)">
+      <sdpi-textfield setting="duration" placeholder="5" pattern="[0-9]*"></sdpi-textfield>
+    </sdpi-item>
+
+    <p class="hint">
+      The icon must exist on the panel (Icons area of the AWTRIX web UI). A sound containing ":" is sent as RTTTL, e.g.
+      <code>ok:d=8,o=6,b=180:c,e,g</code>; anything else is the name of a melody file on the panel. Leave the duration
+      empty to use the panel default.
+    </p>
+  </body>
+</html>

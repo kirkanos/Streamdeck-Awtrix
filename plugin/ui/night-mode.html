@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Night mode settings</title>
+    <script src="sdpi-components.js"></script>
+    <script src="connection.js"></script>
+    <link rel="stylesheet" href="pi.css" />
+  </head>
+  <body>
+    <div id="awtrix-connection"></div>
+
+    <sdpi-item label="Night mode">
+      <sdpi-select setting="mode" default="power">
+        <option value="power">Switch the panel off</option>
+        <option value="brightness">Dim to a night brightness</option>
+      </sdpi-select>
+    </sdpi-item>
+
+    <sdpi-item label="Night brightness">
+      <sdpi-range setting="nightBrightness" default="0" min="0" max="255" step="1" showlabels></sdpi-range>
+    </sdpi-item>
+
+    <p class="hint">
+      Pressing the key toggles night mode. "Dim" works like the night-mode Berry app: auto brightness is switched off and the
+      panel is set to the night brightness; pressing again restores the previous brightness and auto brightness setting.
+      The key shows a moon while night mode is on and a sun while it is off.
+    </p>
+  </body>
+</html>

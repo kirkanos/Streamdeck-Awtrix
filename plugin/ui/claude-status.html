@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Claude status settings</title>
+    <script src="sdpi-components.js"></script>
+    <script src="connection.js"></script>
+    <link rel="stylesheet" href="pi.css" />
+  </head>
+  <body>
+    <div id="awtrix-listener"></div>
+
+    <sdpi-item label="Project">
+      <sdpi-textfield setting="project" placeholder="Folder name, empty for all projects"></sdpi-textfield>
+    </sdpi-item>
+
+    <sdpi-item label="Terminal">
+      <sdpi-select setting="terminal" default="iterm">
+        <option value="iterm">iTerm2</option>
+        <option value="terminal">Terminal</option>
+        <option value="vscode">Visual Studio Code</option>
+        <option value="ghostty">Ghostty</option>
+        <option value="warp">Warp</option>
+      </sdpi-select>
+    </sdpi-item>
+
+    <p class="hint">
+      The project is the folder name Claude Code runs in (what the hook reports). With no project, the key shows the most
+      recently reported state of any project and a badge with the number of pending projects. Pressing the key brings the
+      terminal window whose title contains the project name to the front (macOS, needs Automation permission) and clears
+      the state.
+    </p>
+
+    <div id="awtrix-connection" hidden></div>
+  </body>
+</html>
