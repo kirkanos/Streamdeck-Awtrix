@@ -1,36 +1,53 @@
 import { EventEmitter } from "node:events";
 import {
-  clampBrightness,
-  normalizeHost,
+  ACTIVE_APP_METHOD,
+  activeAppBody,
+  type Auth,
+  authHeaders,
+  baseUrl,
+  type DeviceInfo,
+  type DisplayState,
+  ENDPOINT,
+  neighbourApp,
   type PanelSettings,
-  type PanelStats,
+  parseActiveApp,
   parseApps,
+  parseDevice,
+  parseDisplay,
   parseSettings,
-  parseStats,
-} from "./model";
+  powerBody,
+  settingsBody,
+} from "./api";
+import { clampBrightness, normalizeHost } from "./model";
 
 export type ConnectionState = "unconfigured" | "connecting" | "connected" | "error";
+
+export type Connection = Auth & { host?: string };
 
 export const POLL_INTERVAL_MS = 10_000;
 const TIMEOUT_MS = 5_000;
 
-export type TestResult = { ok: true; version?: string; app?: string } | { ok: false; error: string };
+export type TestResult = { ok: true; name?: string; version?: string } | { ok: false; error: string };
 
 /**
- * Talks to one AWTRIX panel over its HTTP API and keeps its latest state.
- * The panel has no push channel, so /api/stats and /api/settings are polled.
+ * Talks to one AWTRIX NG panel over its REST API (/api/v1) and keeps its
+ * latest state. The panel has no push channel, so /settings, /display and
+ * /apps/active are polled.
  *
  * Events:
- *   "stats"  new stats or settings arrived (or a poll failed)
- *   "apps"   the app list (/api/loop) was loaded
+ *   "stats"  new settings / display / active app arrived (or a poll failed)
+ *   "apps"   the app list (/apps) was loaded
  *   "state"  the connection state changed
  */
 export class AwtrixService extends EventEmitter<{ stats: []; apps: []; state: [] }> {
   #host = "";
+  #auth: Auth = {};
   #state: ConnectionState = "unconfigured";
   #error: string | undefined;
-  #stats: PanelStats | undefined;
-  #panel: PanelSettings = {};
+  #settings: PanelSettings = {};
+  #display: DisplayState | undefined;
+  #activeApp: string | undefined;
+  #device: DeviceInfo = {};
   #apps: string[] = [];
   #timer: ReturnType<typeof setInterval> | undefined;
   #polling: Promise<void> | undefined;
@@ -51,35 +68,50 @@ export class AwtrixService extends EventEmitter<{ stats: []; apps: []; state: []
     return this.#state === "connected";
   }
 
-  /** Latest /api/stats, kept from the last successful poll while offline. */
-  get stats(): PanelStats | undefined {
-    return this.#stats;
-  }
-
-  /** Latest /api/settings (brightness, auto brightness). */
+  /** Latest /settings (brightness, auto brightness), kept while offline. */
   get panel(): PanelSettings {
-    return this.#panel;
+    return this.#settings;
   }
 
-  /** App names in loop order, empty until loaded. */
+  /** Latest /display (power). */
+  get display(): DisplayState | undefined {
+    return this.#display;
+  }
+
+  /** Name of the app currently shown, if the panel reports it. */
+  get activeApp(): string | undefined {
+    return this.#activeApp;
+  }
+
+  /** /device info from the first successful poll. */
+  get device(): DeviceInfo {
+    return this.#device;
+  }
+
+  /** App names in list order, empty until loaded. */
   apps(): string[] {
     return this.#apps;
   }
 
-  /** Applies a new panel host; restarts polling only when it changed. */
-  configure(host: string | undefined): void {
-    const next = normalizeHost(host);
-    if (next === this.#host && (this.#timer || !next)) {
+  /** Applies new connection settings; restarts polling only when they changed. */
+  configure(connection: Connection): void {
+    const host = normalizeHost(connection.host);
+    const auth: Auth = { username: connection.username?.trim() || undefined, password: connection.password || undefined };
+    const same = host === this.#host && auth.username === this.#auth.username && auth.password === this.#auth.password;
+    if (same && (this.#timer || !host)) {
       return;
     }
     this.#stop();
-    this.#host = next;
-    this.#stats = undefined;
-    this.#panel = {};
+    this.#host = host;
+    this.#auth = auth;
+    this.#settings = {};
+    this.#display = undefined;
+    this.#activeApp = undefined;
+    this.#device = {};
     this.#apps = [];
     this.emit("apps");
 
-    if (!next) {
+    if (!host) {
       this.#setState("unconfigured");
       return;
     }
@@ -101,21 +133,27 @@ export class AwtrixService extends EventEmitter<{ stats: []; apps: []; state: []
   async #poll(): Promise<void> {
     const host = this.#host;
     try {
-      const [rawStats, rawSettings] = await Promise.all([this.#get("/api/stats"), this.#get("/api/settings")]);
+      const [rawSettings, rawDisplay, rawActive] = await Promise.all([
+        this.#get(ENDPOINT.settings),
+        this.#get(ENDPOINT.display),
+        this.#get(ENDPOINT.activeApp).catch(() => undefined),
+      ]);
       if (host !== this.#host) {
         return;
       }
-      const stats = parseStats(rawStats);
-      if (!stats) {
-        throw new Error("Unexpected answer from /api/stats");
+      const settings = parseSettings(rawSettings);
+      if (settings.brightness === undefined) {
+        throw new Error(`Unexpected answer from ${ENDPOINT.settings}`);
       }
       const first = !this.isConnected;
-      this.#stats = stats;
-      this.#panel = parseSettings(rawSettings);
+      this.#settings = settings;
+      this.#display = parseDisplay(rawDisplay) ?? this.#display;
+      this.#activeApp = parseActiveApp(rawActive) ?? this.#activeApp;
       this.#setState("connected");
       this.emit("stats");
       if (first) {
         void this.loadApps();
+        void this.#loadDevice();
       }
     } catch (err) {
       if (host === this.#host) {
@@ -127,7 +165,7 @@ export class AwtrixService extends EventEmitter<{ stats: []; apps: []; state: []
 
   async loadApps(): Promise<string[]> {
     try {
-      this.#apps = parseApps(await this.#get("/api/loop"));
+      this.#apps = parseApps(await this.#get(ENDPOINT.apps));
     } catch {
       this.#apps = [];
     }
@@ -135,61 +173,60 @@ export class AwtrixService extends EventEmitter<{ stats: []; apps: []; state: []
     return this.#apps;
   }
 
-  /** Checks a host without changing the configured connection. */
-  static async test(host: string): Promise<TestResult> {
+  async #loadDevice(): Promise<void> {
+    try {
+      this.#device = parseDevice(await this.#get(ENDPOINT.device));
+      this.emit("stats");
+    } catch {
+      // Older firmware without /device: the status block just shows less.
+    }
+  }
+
+  /** Checks a connection without changing the configured one (GET /device, or /display on 404). */
+  static async test(connection: Connection): Promise<TestResult> {
     const service = new AwtrixService();
-    service.#host = normalizeHost(host);
+    service.#host = normalizeHost(connection.host);
+    service.#auth = { username: connection.username?.trim() || undefined, password: connection.password || undefined };
     if (!service.#host) {
       return { ok: false, error: "Please enter the panel host" };
     }
     try {
-      const stats = parseStats(await service.#get("/api/stats"));
-      if (!stats) {
-        return { ok: false, error: "Unexpected answer from /api/stats" };
+      try {
+        const device = parseDevice(await service.#get(ENDPOINT.device));
+        return { ok: true, name: device.name, version: device.version };
+      } catch (err) {
+        if (!(err instanceof HttpError && err.status === 404)) {
+          throw err;
+        }
+        if (!parseDisplay(await service.#get(ENDPOINT.display))) {
+          return { ok: false, error: `Unexpected answer from ${ENDPOINT.display}` };
+        }
+        return { ok: true };
       }
-      return { ok: true, version: stats.version, app: stats.app };
     } catch (err) {
       return { ok: false, error: describeError(err) };
     }
   }
 
-  /** Sets a fixed brightness (turns auto brightness off, as the panel ignores BRI otherwise). */
-  async setBrightness(value: number): Promise<boolean> {
-    const brightness = clampBrightness(value);
-    const ok = await this.#post("/api/settings", { BRI: brightness, ABRI: false });
-    if (ok) {
-      this.#panel = { brightness, autoBrightness: false };
-      if (this.#stats) {
-        this.#stats.brightness = brightness;
-      }
-      this.emit("stats");
-    }
-    return ok;
+  /** Sets a fixed brightness (turns auto brightness off, as the panel overrides the value otherwise). */
+  setBrightness(value: number): Promise<boolean> {
+    return this.setSettings({ brightness: clampBrightness(value), autoBrightness: false });
   }
 
-  async setAutoBrightness(on: boolean): Promise<boolean> {
-    const ok = await this.#post("/api/settings", { ABRI: on });
-    if (ok) {
-      this.#panel = { ...this.#panel, autoBrightness: on };
-      this.emit("stats");
-    }
-    return ok;
+  setAutoBrightness(on: boolean): Promise<boolean> {
+    return this.setSettings({ autoBrightness: on });
   }
 
-  /** Writes brightness and auto brightness together (night mode on / off). */
-  async setBrightnessSettings(settings: PanelSettings): Promise<boolean> {
-    const body: Record<string, number | boolean> = {};
-    if (settings.brightness !== undefined) {
-      body.BRI = clampBrightness(settings.brightness);
-    }
-    if (settings.autoBrightness !== undefined) {
-      body.ABRI = settings.autoBrightness;
-    }
-    const ok = await this.#post("/api/settings", body);
+  /** PATCH /settings; the cached settings are updated on success. */
+  async setSettings(settings: PanelSettings): Promise<boolean> {
+    const ok = await this.#send("PATCH", ENDPOINT.settings, settingsBody(settings));
     if (ok) {
-      this.#panel = { ...this.#panel, ...settings };
-      if (this.#stats && settings.brightness !== undefined) {
-        this.#stats.brightness = clampBrightness(settings.brightness);
+      // Only the keys that were sent change; the cached rest stays.
+      const sent = parseSettings(settingsBody(settings));
+      for (const key of Object.keys(sent) as (keyof PanelSettings)[]) {
+        if (sent[key] !== undefined) {
+          Object.assign(this.#settings, { [key]: sent[key] });
+        }
       }
       this.emit("stats");
     }
@@ -197,33 +234,32 @@ export class AwtrixService extends EventEmitter<{ stats: []; apps: []; state: []
   }
 
   async setPower(on: boolean): Promise<boolean> {
-    const ok = await this.#post("/api/power", { power: on });
-    if (ok && this.#stats) {
-      this.#stats.matrix = on;
+    const ok = await this.#send("PATCH", ENDPOINT.display, powerBody(on));
+    if (ok) {
+      this.#display = { power: on };
       this.emit("stats");
     }
     return ok;
   }
 
   async switchApp(name: string): Promise<boolean> {
-    const ok = await this.#post("/api/switch", { name });
-    if (ok && this.#stats) {
-      this.#stats.app = name;
+    const ok = await this.#send(ACTIVE_APP_METHOD, ENDPOINT.activeApp, activeAppBody(name));
+    if (ok) {
+      this.#activeApp = name;
       this.emit("stats");
     }
     return ok;
   }
 
-  async nextApp(): Promise<boolean> {
-    return this.#post("/api/nextapp");
+  /** Switches to the app after / before the shown one in the app list. */
+  async stepApp(direction: 1 | -1): Promise<boolean> {
+    const apps = this.#apps.length > 0 ? this.#apps : await this.loadApps();
+    const next = neighbourApp(apps, this.#activeApp, direction);
+    return next === undefined ? false : this.switchApp(next);
   }
 
-  async previousApp(): Promise<boolean> {
-    return this.#post("/api/previousapp");
-  }
-
-  async notify(payload: Record<string, string | number>): Promise<boolean> {
-    return this.#post("/api/notify", payload);
+  notify(body: Record<string, string | number | boolean>): Promise<boolean> {
+    return this.#send("POST", ENDPOINT.notifications, body);
   }
 
   #stop(): void {
@@ -234,23 +270,26 @@ export class AwtrixService extends EventEmitter<{ stats: []; apps: []; state: []
   }
 
   async #get(path: string): Promise<unknown> {
-    const response = await fetch(`http://${this.#host}${path}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const response = await fetch(`${baseUrl(this.#host)}${path}`, {
+      headers: authHeaders(this.#auth),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status} from ${path}`);
+      throw new HttpError(response.status, path);
     }
     return response.json();
   }
 
-  /** POSTs JSON; false when the panel is not configured or the request failed. */
-  async #post(path: string, body?: Record<string, unknown>): Promise<boolean> {
+  /** Sends JSON; false when the panel is not configured or the request failed. */
+  async #send(method: string, path: string, body: Record<string, unknown>): Promise<boolean> {
     if (!this.#host) {
       return false;
     }
     try {
-      const response = await fetch(`http://${this.#host}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body ?? {}),
+      const response = await fetch(`${baseUrl(this.#host)}${path}`, {
+        method,
+        headers: { "Content-Type": "application/json", ...authHeaders(this.#auth) },
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       return response.ok;
@@ -266,6 +305,16 @@ export class AwtrixService extends EventEmitter<{ stats: []; apps: []; state: []
     this.#state = state;
     this.#error = error;
     this.emit("state");
+  }
+}
+
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    path: string,
+  ) {
+    super(status === 401 ? "Login required: check username and password" : `HTTP ${status} from ${path}`);
+    this.name = "HttpError";
   }
 }
 

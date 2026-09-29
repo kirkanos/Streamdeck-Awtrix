@@ -22,39 +22,38 @@ const nightBrightness = (s: NightModeSettings): number => clampBrightness(Number
 export class NightModeAction extends KeyImageAction<NightModeSettings> {
   protected image(settings: NightModeSettings): string | undefined {
     const unavailable = unavailableImage();
-    if (unavailable || !awtrix.stats) {
+    if (unavailable) {
       return unavailable;
     }
     return nightModeKey({
-      active: isNightActive(mode(settings), nightBrightness(settings), awtrix.stats, awtrix.panel, settings.active),
+      active: isNightActive(mode(settings), nightBrightness(settings), awtrix.display, awtrix.panel, settings.active),
       mode: mode(settings),
-      brightness: awtrix.panel.brightness ?? awtrix.stats.brightness,
+      brightness: awtrix.panel.brightness ?? 0,
       nightBrightness: nightBrightness(settings),
     });
   }
 
   override async onKeyDown(ev: KeyDownEvent<NightModeSettings>): Promise<void> {
-    const stats = awtrix.stats;
-    if (!awtrix.isConnected || !stats) {
+    if (!awtrix.isConnected) {
       await ev.action.showAlert();
       return;
     }
     const settings = { ...ev.payload.settings };
-    const active = isNightActive(mode(settings), nightBrightness(settings), stats, awtrix.panel, settings.active);
+    const active = isNightActive(mode(settings), nightBrightness(settings), awtrix.display, awtrix.panel, settings.active);
 
     let ok: boolean;
     if (mode(settings) === "power") {
       ok = await awtrix.setPower(active);
     } else if (active) {
-      ok = await awtrix.setBrightnessSettings({
+      ok = await awtrix.setSettings({
         brightness: settings.previousBrightness ?? DEFAULT_BRIGHTNESS,
         autoBrightness: settings.previousAuto ?? false,
       });
     } else {
       // Same as the night-mode Berry app: remember, then dim with auto brightness off.
-      settings.previousBrightness = awtrix.panel.brightness ?? stats.brightness;
+      settings.previousBrightness = awtrix.panel.brightness ?? DEFAULT_BRIGHTNESS;
       settings.previousAuto = awtrix.panel.autoBrightness ?? false;
-      ok = await awtrix.setBrightnessSettings({ brightness: nightBrightness(settings), autoBrightness: false });
+      ok = await awtrix.setSettings({ brightness: nightBrightness(settings), autoBrightness: false });
     }
 
     if (!ok) {

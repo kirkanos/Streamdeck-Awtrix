@@ -19,7 +19,7 @@ export class AppSwitchAction extends KeyImageAction<AppSwitchSettings> {
     if (mode(settings) === "app" && !appName) {
       return messageKey("Select", "an app");
     }
-    return unavailableImage() ?? appSwitchKey({ mode: mode(settings), appName, currentApp: hasTitle ? undefined : awtrix.stats?.app });
+    return unavailableImage() ?? appSwitchKey({ mode: mode(settings), appName, currentApp: hasTitle ? undefined : awtrix.activeApp });
   }
 
   override async onKeyDown(ev: KeyDownEvent<AppSwitchSettings>): Promise<void> {
@@ -31,10 +31,10 @@ export class AppSwitchAction extends KeyImageAction<AppSwitchSettings> {
         ok = appName ? await awtrix.switchApp(appName) : false;
         break;
       case "previous":
-        ok = await awtrix.previousApp();
+        ok = await awtrix.stepApp(-1);
         break;
       default:
-        ok = await awtrix.nextApp();
+        ok = await awtrix.stepApp(1);
     }
     if (!ok) {
       await ev.action.showAlert();

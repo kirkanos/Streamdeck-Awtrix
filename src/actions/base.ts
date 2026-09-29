@@ -18,7 +18,7 @@ export function unavailableImage(): string | undefined {
   if (awtrix.state === "unconfigured") {
     return messageKey("Set up", "panel host");
   }
-  if (!awtrix.isConnected || !awtrix.stats) {
+  if (!awtrix.isConnected) {
     return messageKey("Offline", awtrix.state === "error" ? "check host" : "connecting…");
   }
   return undefined;

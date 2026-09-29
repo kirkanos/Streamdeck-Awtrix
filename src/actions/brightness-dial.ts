@@ -46,11 +46,11 @@ export class BrightnessDialAction extends SingletonAction<BrightnessSettings> {
   }
 
   override async onDialRotate(ev: DialRotateEvent<BrightnessSettings>): Promise<void> {
-    if (!awtrix.isConnected || !awtrix.stats) {
+    if (!awtrix.isConnected || awtrix.panel.brightness === undefined) {
       return;
     }
     const step = Number(ev.payload.settings.step) || BRIGHTNESS_STEP;
-    const current = this.#target ?? awtrix.panel.brightness ?? awtrix.stats.brightness;
+    const current = this.#target ?? awtrix.panel.brightness;
     this.#target = stepBrightness(current, ev.payload.ticks, step);
     await this.refresh();
     this.#scheduleSend();
@@ -106,11 +106,11 @@ export class BrightnessDialAction extends SingletonAction<BrightnessSettings> {
     let canvas: string;
     if (awtrix.state === "unconfigured") {
       canvas = dialMessage("Set up", "panel host in the dial settings");
-    } else if (!awtrix.isConnected || !awtrix.stats) {
+    } else if (!awtrix.isConnected) {
       canvas = dialMessage("Offline", awtrix.state === "error" ? "check host" : "connecting…");
     } else {
       canvas = brightnessCanvas({
-        value: this.#target ?? awtrix.panel.brightness ?? awtrix.stats.brightness,
+        value: this.#target ?? awtrix.panel.brightness ?? 0,
         auto: awtrix.panel.autoBrightness ?? false,
       });
     }

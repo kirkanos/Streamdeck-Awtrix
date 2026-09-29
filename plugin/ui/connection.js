@@ -24,7 +24,16 @@
   };
 
   let hostEdited = false;
+  let authEdited = false;
   let portEdited = false;
+
+  function connection() {
+    return {
+      host: ($("awtrix-host").value || "").trim(),
+      username: ($("awtrix-username").value || "").trim(),
+      password: $("awtrix-password").value || "",
+    };
+  }
 
   function send(payload) {
     client.send("sendToPlugin", payload);
@@ -47,10 +56,14 @@
     $("awtrix-status-detail").textContent = status.error
       ? `${status.host} · ${status.error}`
       : status.state === "connected"
-        ? `${status.host} · AWTRIX ${status.version || "?"} · app: ${status.app || "–"}`
+        ? [status.host, status.name, status.version ? `v${status.version}` : "", status.app ? `app: ${status.app}` : ""].filter(Boolean).join(" · ")
         : status.host;
     if (!hostEdited && !$("awtrix-host").value) {
       $("awtrix-host").value = status.host || "";
+    }
+    if (!authEdited && !$("awtrix-username").value) {
+      $("awtrix-username").value = status.username || "";
+      $("awtrix-password").placeholder = status.hasPassword ? "(saved)" : "";
     }
 
     if ($("awtrix-listener-status")) {
@@ -76,7 +89,7 @@
         $("awtrix-test").disabled = false;
         showMessage(
           "awtrix-message",
-          payload.ok ? `Panel reachable (AWTRIX ${payload.version || "?"}, app: ${payload.app || "–"})` : payload.error,
+          payload.ok ? `Panel reachable${payload.name ? ` (${payload.name}${payload.version ? ` v${payload.version}` : ""})` : ""}` : payload.error,
           payload.ok ? "success" : "error",
         );
         break;
@@ -98,6 +111,8 @@
       </div>
     </sdpi-item>
     <sdpi-item label="Host"><sdpi-textfield id="awtrix-host" placeholder="192.168.1.42 or awtrix.local"></sdpi-textfield></sdpi-item>
+    <sdpi-item label="Username"><sdpi-textfield id="awtrix-username" placeholder="Only if the device has a login"></sdpi-textfield></sdpi-item>
+    <sdpi-item label="Password"><sdpi-password id="awtrix-password"></sdpi-password></sdpi-item>
     <sdpi-item>
       <div class="buttons">
         <sdpi-button id="awtrix-test">Test</sdpi-button>
@@ -105,7 +120,7 @@
       </div>
     </sdpi-item>
     <div id="awtrix-message" class="message" hidden></div>
-    <p class="hint">IP address or host name of the panel, without http://. "Test" calls /api/stats. The host is shared by all keys and dials.</p>`;
+    <p class="hint">IP address or host name of the AWTRIX NG panel, without http://. "Test" calls /api/v1/device. Username and password are only needed when a device login is configured; the connection is shared by all keys and dials.</p>`;
 
   const LISTENER_TEMPLATE = `
     <sdpi-item label="Claude listener">
@@ -122,22 +137,24 @@
     $("awtrix-connection").innerHTML = PANEL_TEMPLATE;
 
     $("awtrix-host").addEventListener("input", () => (hostEdited = true));
+    $("awtrix-username").addEventListener("input", () => (authEdited = true));
+    $("awtrix-password").addEventListener("input", () => (authEdited = true));
 
     $("awtrix-test").addEventListener("click", () => {
-      const host = ($("awtrix-host").value || "").trim();
-      if (!host) {
+      const c = connection();
+      if (!c.host) {
         showMessage("awtrix-message", "Please enter the panel host", "error");
         return;
       }
       showMessage("awtrix-message", "Testing…", "");
       $("awtrix-test").disabled = true;
-      send({ event: "testHost", host });
+      send({ event: "testHost", ...c });
     });
 
     $("awtrix-save").addEventListener("click", () => {
       showMessage("awtrix-message", "Saving…", "");
       $("awtrix-save").disabled = true;
-      send({ event: "setHost", host: ($("awtrix-host").value || "").trim() });
+      send({ event: "setHost", ...connection() });
     });
 
     const listener = $("awtrix-listener");

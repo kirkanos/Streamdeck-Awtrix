@@ -5,14 +5,14 @@ import { ClaudeStatusAction } from "./actions/claude-status";
 import { NightModeAction } from "./actions/night-mode";
 import { NotifyAction } from "./actions/notify";
 import { normalizeHost } from "./awtrix/model";
-import { awtrix, AwtrixService } from "./awtrix/service";
+import { awtrix, AwtrixService, type Connection } from "./awtrix/service";
 import { ClaudeListener, DEFAULT_PORT, isValidPort } from "./claude/listener";
 import { claudeState } from "./claude/store";
 
 type JsonValue = Parameters<typeof streamDeck.ui.sendToPropertyInspector>[0];
 
-/** Global settings: the panel and the local listener for the Claude Code hook. */
-export type GlobalSettings = { host?: string; listenerPort?: number };
+/** Global settings: the panel connection and the local listener for the Claude Code hook. */
+export type GlobalSettings = Connection & { listenerPort?: number };
 
 streamDeck.logger.setLevel("info");
 
@@ -62,8 +62,8 @@ listener.on("state", () => {
 
 type UiMessage =
   | { event: "getApps" | "getStatus" }
-  | { event: "setHost"; host: string }
-  | { event: "testHost"; host: string }
+  | { event: "setHost"; host: string; username?: string; password?: string }
+  | { event: "testHost"; host: string; username?: string; password?: string }
   | { event: "setListenerPort"; listenerPort: number | string };
 
 streamDeck.ui.onSendToPlugin<UiMessage>(async (ev) => {
@@ -76,13 +76,18 @@ streamDeck.ui.onSendToPlugin<UiMessage>(async (ev) => {
       sendToPropertyInspector(statusMessage());
       break;
     case "testHost": {
-      const result = await AwtrixService.test(message.host);
+      const result = await AwtrixService.test({ host: message.host, username: message.username, password: message.password });
       sendToPropertyInspector({ event: "testHost", ...result });
       break;
     }
     case "setHost": {
       const host = normalizeHost(message.host);
-      await saveSettings({ ...globalSettings, host: host || undefined });
+      await saveSettings({
+        ...globalSettings,
+        host: host || undefined,
+        username: message.username?.trim() || undefined,
+        password: message.password || undefined,
+      });
       const ok = await awtrix.poll();
       sendToPropertyInspector({ event: "setHost", ok, error: ok ? undefined : awtrix.error });
       break;
@@ -110,8 +115,11 @@ function statusMessage(): JsonValue {
     state: awtrix.state,
     host: awtrix.host,
     error: awtrix.error ?? "",
-    app: awtrix.stats?.app ?? "",
-    version: awtrix.stats?.version ?? "",
+    username: globalSettings.username ?? "",
+    hasPassword: Boolean(globalSettings.password),
+    app: awtrix.activeApp ?? "",
+    name: awtrix.device.name ?? "",
+    version: awtrix.device.version ?? "",
     listenerState: listener.state,
     listenerPort: listener.port,
     listenerError: listener.error ?? "",
@@ -127,7 +135,7 @@ function sendToPropertyInspector(payload: JsonValue): void {
 
 function applySettings(settings: GlobalSettings): void {
   globalSettings = settings;
-  awtrix.configure(settings.host);
+  awtrix.configure(settings);
   listener.start(isValidPort(settings.listenerPort) ? settings.listenerPort : DEFAULT_PORT);
 }
 
