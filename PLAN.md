@@ -1,6 +1,6 @@
 # Streamdeck-Awtrix
 
-Stream Deck plugin `com.kirkanos.awtrix`. Status: M1 to M3 implemented (see README.md), M4 open.
+Stream Deck plugin `com.kirkanos.awtrix`. Status: M1–M4 done, released 1.0.0.
 
 ## Goal
 

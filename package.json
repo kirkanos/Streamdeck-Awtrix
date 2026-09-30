@@ -1,6 +1,6 @@
 {
   "name": "streamdeck-awtrix",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "AWTRIX Remote: Control an AWTRIX NG panel and show Claude Code status on the Stream Deck.",
